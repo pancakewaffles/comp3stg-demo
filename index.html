@@ -1,0 +1,166 @@
+
+
+<html>
+
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<link rel="stylesheet" href="/lib/bootstrap.min.css">
+<link rel="stylesheet" href="/lib/dbslice.css">
+</head>
+
+<body>
+  <form>
+    <div class="form-group">
+      <label for="exampleroominput">Choose a room name</label>
+      <input type="text" class="form-control" id="exampleroominput" aria-describedby="emailHelp" placeholder="ath101">
+      <small id="roominputhelp" class="form-text text-muted">If you leave this blank, the default room will be 'ath101'.</small>
+    </div>
+  </form>
+<button type="button" class="btn btn-primary" onclick="send_inventory_list(session)">Primary</button>
+<div class="container-fluid" id="target"> </div>
+
+
+
+<script src="/lib/jquery.min.js"></script>
+<script src="/lib/popper.min.js"></script>
+<script src="/lib/bootstrap.min.js"></script>
+
+<script src="/lib/d3.v4.min.js"></script>
+<script src="/lib/crossfilter.js"></script>
+<script src="/lib/three.js"></script>
+<script src="/lib/OrbitControls.js"></script>
+<script src="/lib/d3-contour.v1.min.js"></script>
+<script src="/lib/d3-scale-chromatic.v1.min.js"></script>
+<script src="/lib/d3-tip.js"></script>
+
+
+<script src="/lib/dbslice.js"></script>
+
+
+<script>
+var session;
+
+d3.json( "data/metaData.json" , function( metaData ) {
+
+    var cfData = dbslice.cfInit( metaData );
+
+    var plots = [];
+
+    var plot = {
+        plotFunc : dbslice.cfD3BarChart,
+        layout : { title : "Design", colWidth : 4, height : 300 },
+        data : { cfData : cfData, property : "Design"}
+    };
+    plots.push(plot);
+
+    var plot = {
+        plotFunc : dbslice.cfD3BarChart,
+        layout : { title : "Speed", colWidth : 4, height : 300 },
+        data : { cfData : cfData, property : "Speed"}
+    };
+    plots.push(plot);
+
+    var plot = {
+        plotFunc : dbslice.cfD3Histogram,
+        layout : { title : "Pressure ratio", colWidth : 4, height : 300 },
+        data : { cfData : cfData, property : "Pressure ratio"}
+    };
+    plots.push(plot);
+
+    var plot = {
+        plotFunc : dbslice.cfD3Scatter,
+        layout : { title : "Pressure ratio characteristic", colWidth : 6, height : 300 },
+        data : { cfData : cfData, xProperty : "Mass flow", yProperty : "Pressure ratio", cProperty : "Design"}
+    };
+    plots.push(plot);
+
+    var plot = {
+        plotFunc : dbslice.cfD3Scatter,
+        layout : { title : "Polytropic efficiency characteristic", colWidth : 6, height : 300 },
+        data : { cfData : cfData, xProperty : "Mass flow", yProperty : "Efficiency", cProperty : "Design"}
+    };
+    plots.push(plot);
+
+    var ctrlLines = {
+        plotFunc : dbslice.d3LineSeries,
+        layout : { colWidth : 4, height : 300, xAxisLabel : "Axial distance", yAxisLabel : "Mach number"},
+        urlTemplate : "./data/Mis_line1d_mid_${sliceId}_task_${taskId}.json" ,
+        taskIds : null ,
+        sliceIds : ["rotor1", "rotor2", "rotor3"],
+        tasksByFilter : true ,
+        maxTasks : 12 ,
+        formatDataFunc : function ( data ) {
+            var series = [];
+            data.forEach( function( line, index ) { series.push( line ) } );
+            var dataOut = { series : series };
+            return dataOut;
+        }
+    }
+
+    var ctrlContour = {
+        layout : { colWidth : 2, height : 300 },
+        plotFunc : dbslice.d3ContourStruct2d,
+        urlTemplate : "./data/ent_area2d_exit_rotor3_task_${taskId}.json" ,
+        taskIds : null ,
+        tasksByFilter : true ,
+        maxTasks : 12 ,
+    }
+
+    var ctrlSurf = {
+        layout : {colWidth : 4, height : 500 , vScale : [ 0.4, 1.1 ] },
+        plotFunc : dbslice.threeSurf3d,
+        urlTemplate : "./data/Mis_area3d_rotor1_task_${taskId}.json" ,
+        taskIds : null ,
+        tasksByFilter : true ,
+        maxTasks : 6 ,
+        formatDataFunc : function (data) { return dbslice.threeMeshFromStruct( data )}
+
+    }
+
+    session = {
+        title : "3-Stage Axial Compressor",
+        plotRows : [
+            { title : "Compressor database" , plots : plots },
+            { title : "Mid-height Mach number" , plots : [], ctrl:ctrlLines },
+            { title : "Rotor 3 exit entropy" , plots : [], ctrl:ctrlContour },
+            { title : "Rotor 1 surface Mach number" , plots : [], ctrl:ctrlSurf }
+        ]
+    };
+
+    dbslice.render ("target", session, { plotTasksButton : true } );
+});
+
+function send_inventory_list(session){
+  let url = "https://hissing-thrush.glitch.me";
+  let room = document.getElementById('exampleroominput').value;
+  let maxTasks = 2;
+  let urlTemplate = window.location.href + "data/Mis_area3d_rotor1_task_${taskId}.json";
+  let taskids = session.filteredTaskIds;
+  let labels = session.filteredTaskLabels;
+  let inventory_list = [];
+
+  console.log(taskids);
+
+  for(let i = 1;i<=maxTasks;i++){
+    let t = {'entity_id': 'task'+taskids[i]+'rotor1',
+             'task_id': 'task'+i,
+             'mesh_url': 'https://cdn.glitch.com/c8dab513-80c0-4688-93bc-75be8c9abc64%2Ftask1_rotor1.prwm?1534412773019'//urlTemplate.replace('${taskId}',taskids[i])
+           }
+    inventory_list.push(t);
+
+  }
+
+
+  window.open(url + '?' + 'room=' + room + '&' + 'inventory_list=' + window.btoa(encodeURI(JSON.stringify(inventory_list))) ,'_blank');
+
+  console.log(inventory_list);
+
+}
+
+</script>
+
+
+
+</body>
+</html>
